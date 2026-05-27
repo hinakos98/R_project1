@@ -1,0 +1,114 @@
+---
+title: "Final"
+author: "Hinako Samson"
+date: "2024-03-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r prep}
+cbc <- read.csv("CharlesBookClub.csv")
+str(cbc)
+#install.packages("tidyverse")
+library("tidyverse")
+view(cbc)
+```
+
+```{r ggplot2}
+#R = recency, time since last purchase
+#F = frequency, number of previous purchases from the company over a period
+#M = monetary, amount of money spent on the company’s products over a period
+ggplot(data = cbc) +
+  geom_point(mapping = aes(x= M, y= F))
+```
+
+```{r K-NN}
+library(class)
+summary(cbc)
+hist(cbc$ArtBks)
+plot(cbc$R,cbc$FirstPurch)
+
+p <- 0.8
+train.index <- sample.int(nrow(cbc), nrow(cbc) * p)
+str(train.index)
+summary(train.index)
+data.train <- cbc[train.index,]
+data.val <- cbc[-train.index,]  # Using -train.index to get the complement of train.index
+str(data.train)
+str(data.val)
+
+set.seed(1)
+Ypred_knn= knn(data.train[,c("Rcode", "Mcode")],
+               data.val[,c("Rcode", "Mcode")],
+               data.train$Gender,
+               k=5)
+table(data.val$Gender, Ypred_knn)
+#true positive/negative and false 
+#1=female 0=male
+
+my.statistics <- function(Actual, Predicted){
+  confusion.table <- table(Actual= Actual, Predicted= Predicted)
+  output <- list(confusion.table=confusion.table)
+  TN <- confusion.table[1]
+  FN <- confusion.table[2]
+  FP <- confusion.table[3]
+  TP <- confusion.table[4]
+  output$accuracy <- (TP+TN)/sum(confusion.table)
+  output$precission <- (TP)/(TP+FP)
+  output$sensitivity <- (TP)/(TP+FN)
+  output$specificity <- (TN)/(TN+FP)
+  output$FPR <- (FP)/(TN+FP)
+  return(output)
+}
+
+my.statistics(Actual = data.val$Gender, Predicted = Ypred_knn)
+
+```
+
+```{r logistic regression}
+theme_set(theme_minimal())
+ggplot(cbc, aes(x = R,
+                y= Yes_Florence)) +
+  geom_jitter(height = .05,
+              alpha = .1)
+model <- glm(Yes_Florence ~ R,
+             data = cbc,
+             family = "binomial")
+summary(model)
+
+ggplot(cbc, aes(x = R,
+                y= Yes_Florence)) +
+  geom_jitter(height = .05,
+              alpha = .1) +
+  geom_smooth(method = "glm",
+              method.args = list(family = "binomial"),
+              se = FALSE)
+
+flo_sum <- cbc %>%
+  group_by(R) %>%
+  summarise(prop_flo = mean(Yes_Florence),
+            count = n())
+flo_sum
+
+ggplot(flo_sum, aes(x = R,
+                    y = prop_flo)) +
+  geom_point()
+
+model2 <- glm(prop_flo ~ R,
+              family = "binomial",
+              data = flo_sum,
+              weights = count)
+
+summary(model2)
+
+ggplot(flo_sum, aes(x = R,
+                    y = prop_flo,
+                    weight = count)) +
+  geom_point() +
+  geom_smooth(method = "glm",
+              se = FALSE,
+              method.args = list(family = "binomial"))
+```
